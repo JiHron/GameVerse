@@ -1,89 +1,171 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Chess } from "chess.js";
-import { Chessboard } from "react-chessboard";
+import { useRef, useState, useEffect } from "react";
+import { Chess, type Square, type Move } from "chess.js";
+import { Chessboard, type PieceDropHandlerArgs, type SquareHandlerArgs } from "react-chessboard";
 
-type Move = {
-  from: string;
-  to: string;
-  piece?: string;
-  captured?: string;
-};
+interface ChessGameProps {
+  onMove?: (move: Move, history: Move[]) => void;
+  onGameStateChange?: (gameState: {
+    isGameOver: boolean;
+    isCheckmate: boolean;
+    isDraw: boolean;
+    turn: 'w' | 'b';
+  }) => void;
+}
 
-export default function ChessGame() {
-  const chessRef = useRef(new Chess());
-  // Přidej fen s getterem
-  const [fen, setFen] = useState(chessRef.current.fen());
-  const [moves, setMoves] = useState<Move[]>([]);
-  const [boardWidth, setBoardWidth] = useState(Math.min(window.innerWidth * 0.8, 560));
+export default function ChessGame({ onMove, onGameStateChange }: ChessGameProps) {
+  const chessGameRef = useRef(new Chess());
+  const chessGame = chessGameRef.current;
 
-  const update = () => setFen(chessRef.current.fen());
+  const [chessPosition, setChessPosition] = useState(chessGame.fen());
+  const [moveFrom, setMoveFrom] = useState('');
+  const [optionSquares, setOptionSquares] = useState<Record<string, React.CSSProperties>>({});
 
+  // notify parent of game state changes
   useEffect(() => {
-    const handleResize = () => setBoardWidth(Math.min(window.innerWidth * 0.8, 560));
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  useEffect(() => {
-    fetch("http://localhost:8000/api/status")
-      .then(r => r.json())
-      .then(d => {
-        const el = document.getElementById("status");
-        if (el) el.innerText = `Server: ${d.status}`;
-      })
-      .catch(() => {
-        const el = document.getElementById("status");
-        if (el) el.innerText = "Server: offline";
+    if (onGameStateChange) {
+      onGameStateChange({
+        isGameOver: chessGame.isGameOver(),
+        isCheckmate: chessGame.isCheckmate(),
+        isDraw: chessGame.isDraw(),
+        turn: chessGame.turn()
       });
-  }, []);
+    }
+  }, [chessPosition, onGameStateChange, chessGame]);
 
-  function onPieceDrop(source: string, target: string) {
-    console.log("Tah z", source, "na", target); // debugger log
-    const move = chessRef.current.move({
-      from: source,
-      to: target,
-      promotion: "q",
-    } as any);
+  // get the move options for a square to show valid moves
+  function getMoveOptions(square: Square) {
+    const moves = chessGame.moves({
+      square,
+      verbose: true
+    });
 
-    if (move === null) {
-      return false; // tah není povolen
-    } else {
-      setMoves(m => [...m, { from: source, to: target, piece: move.piece, captured: (move as any).captured }]);
-      update();
-      fetch("http://localhost:8000/api/move", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ from_square: source, to_square: target }),
-      }).catch(() => {});
-      return true; // tah povolen
+    // if no moves, clear the option squares (may continue to show last touched piece)
+    if (moves.length === 0) {
+      setOptionSquares({});
+      return false;
+    }
+
+    // create a new object to store the option squares
+    const newSquares: Record<string, React.CSSProperties> = {};
+
+    // show all possible moves with this piece
+    for (const move of moves) {
+      newSquares[move.to] = {
+        background: chessGame.get(move.to) && chessGame.get(move.to)?.color !== chessGame.get(square)?.color
+          ? 'radial-gradient(circle, rgba(0,0,0,.1) 85%, transparent 85%)' // larger circle for capturing
+          : 'radial-gradient(circle, rgba(0,0,0,.1) 25%, transparent 25%)', // smaller circle for moving
+        borderRadius: '50%'
+      };
+    }
+
+    // set the square clicked to move from to yellow (add to previous return?)
+    newSquares[square] = {
+      background: 'rgba(255, 255, 0, 0.4)'
+    };
+
+    setOptionSquares(newSquares);
+
+    return true;
+  }
+
+  function onSquareClick({ square, piece }: SquareHandlerArgs) {
+    // if there is no piece selected and a piece is clicked, get the move options
+    if (!moveFrom && piece) {
+      const hasMoveOptions = getMoveOptions(square as Square);
+
+      if (hasMoveOptions) {
+        setMoveFrom(square);
+      }
+
+      return;
+    }
+
+    // square clicked to move to, check if valid move
+    const moves = chessGame.moves({
+      square: moveFrom as Square,
+      verbose: true
+    });
+    const foundMove = moves.find(m => m.from === moveFrom && m.to === square);
+
+    if (!foundMove) {
+      // check if clicked on new piece
+      const hasMoveOptions = getMoveOptions(square as Square);
+
+      // if new piece, setMoveFrom, otherwise clear moveFrom
+      setMoveFrom(hasMoveOptions ? square : '');
+
+      return;
+    }
+
+    // is normal move
+    try {
+      const move = chessGame.move({
+        from: moveFrom,
+        to: square,
+        promotion: 'q'
+      });
+
+      // update the position state
+      setChessPosition(chessGame.fen());
+
+      // notify parent of the move
+      if (onMove && move) {
+        onMove(move, chessGame.history({ verbose: true }));
+      }
+
+      setMoveFrom('');
+      setOptionSquares({});
+    } catch {
+      // if invalid, setMoveFrom and getMoveOptions
+      const hasMoveOptions = getMoveOptions(square as Square);
+
+      if (hasMoveOptions) {
+        setMoveFrom(square);
+      }
+
+      return;
     }
   }
 
-  function onReset() {
-    chessRef.current.reset();
-    setMoves([]);
-    update();
+  // handle piece drop
+  function onPieceDrop({ sourceSquare, targetSquare }: PieceDropHandlerArgs) {
+    // catch null targetSquare (if dropped off board)
+    if (!targetSquare) {
+      return false;
+    }
+
+    // try to make the move according to chess.js logic
+    try {
+      const move = chessGame.move({
+        from: sourceSquare,
+        to: targetSquare,
+        promotion: 'q' // always promote to a queen
+      });
+
+      setChessPosition(chessGame.fen());  // re-render chessboard
+
+      // notify parent (sidebar moves) of the move
+      if (onMove && move) {
+        onMove(move, chessGame.history({ verbose: true }));
+      }
+
+      setMoveFrom('');
+      setOptionSquares({});
+
+      return true;
+    } catch {
+      return false;
+    }
   }
 
-  return (
-    <div style={{ display: "flex", gap: 16, flexWrap: "wrap", maxWidth: "100vw" }}>
-      <div style={{ flex: "1 1 auto", minWidth: 280, maxWidth: boardWidth }}>
-        <Chessboard position={fen} onPieceDrop={onPieceDrop} boardWidth={boardWidth} />
-        <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-          <button onClick={onReset}>Reset</button>
-          <div id="status" style={{ marginLeft: "auto", alignSelf: "center" }}></div>
-        </div>
-      </div>
-      <div style={{ flexShrink: 0, width: 220, minWidth: 200 }}>
-        <h3>Moves</h3>
-        <ol>
-          {moves.map((mv, i) => (
-            <li key={i}>
-              {mv.from} → {mv.to} {mv.captured ? `(x ${mv.captured})` : ""}
-            </li>
-          ))}
-        </ol>
-      </div>
-    </div>
-  );
+  // chessboard options
+  const chessboardOptions = {
+    onPieceDrop,
+    onSquareClick,
+    position: chessPosition,
+    squareStyles: optionSquares,
+    id: 'click-or-drag-to-move'
+  };
+
+  return <Chessboard options={chessboardOptions} />;
 }
