@@ -59,11 +59,14 @@ export default function ChessGame() {
       setFen(gameCopy.fen());
       setMoves(m => [...m, { from: sourceSquare, to: targetSquare, piece: move.piece, captured: (move as any).captured }]);
 
+      // this is logging to the backend (Unneeded)
+      /*
       fetch("http://localhost:8000/api/move", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ from_square: sourceSquare, to_square: targetSquare }),
       }).catch(() => { });
+      */
       return true; // tah povolen
     }
   }
