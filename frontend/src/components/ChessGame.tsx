@@ -1,107 +1,180 @@
-import { useEffect, useState } from "react";
-import { Chess } from "chess.js";
-import { Chessboard, type PieceDropHandlerArgs } from "react-chessboard";
-
-type Move = {
-  from: string;
-  to: string;
-  piece?: string;
-  captured?: string;
-};
+import { useRef, useState } from "react";
+import { Chess, type Square } from "chess.js";
+import { Chessboard, type PieceDropHandlerArgs, type SquareHandlerArgs } from "react-chessboard";
 
 export default function ChessGame() {
-  const [game, setGame] = useState(new Chess());
-  const [fen, setFen] = useState(game.fen());
-  const [moves, setMoves] = useState<Move[]>([]);
-  const [boardWidth, setBoardWidth] = useState(Math.min(window.innerWidth * 0.8, 560));
+  // create a chess game using a ref to always have access to the latest game state within closures and maintain the game state across renders
+  const chessGameRef = useRef(new Chess());
+  const chessGame = chessGameRef.current;
 
-  useEffect(() => {
-    const handleResize = () => setBoardWidth(Math.min(window.innerWidth * 0.8, 560));
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  // track the current position of the chess game in state to trigger a re-render of the chessboard
+  const [chessPosition, setChessPosition] = useState(chessGame.fen());
+  const [moveFrom, setMoveFrom] = useState('');
+  const [optionSquares, setOptionSquares] = useState<Record<string, React.CSSProperties>>({});
 
-  useEffect(() => {
-    fetch("http://localhost:8000/api/status")
-      .then(r => r.json())
-      .then(d => {
-        const el = document.getElementById("status");
-        if (el) el.innerText = `Server: ${d.status}`;
-      })
-      .catch(() => {
-        const el = document.getElementById("status");
-        if (el) el.innerText = "Server: offline";
+  // get the move options for a square to show valid moves
+  function getMoveOptions(square: Square) {
+    // get the moves for the square
+    const moves = chessGame.moves({
+      square,
+      verbose: true
+    });
+
+    // if no moves, clear the option squares
+    if (moves.length === 0) {
+      setOptionSquares({});
+      return false;
+    }
+
+    // create a new object to store the option squares
+    const newSquares: Record<string, React.CSSProperties> = {};
+
+    // loop through the moves and set the option squares
+    for (const move of moves) {
+      newSquares[move.to] = {
+        background: chessGame.get(move.to) && chessGame.get(move.to)?.color !== chessGame.get(square)?.color
+          ? 'radial-gradient(circle, rgba(0,0,0,.1) 85%, transparent 85%)' // larger circle for capturing
+          : 'radial-gradient(circle, rgba(0,0,0,.1) 25%, transparent 25%)', // smaller circle for moving
+        borderRadius: '50%'
+      };
+    }
+
+    // set the square clicked to move from to yellow
+    newSquares[square] = {
+      background: 'rgba(255, 255, 0, 0.4)'
+    };
+
+    // set the option squares
+    setOptionSquares(newSquares);
+
+    // return true to indicate that there are move options
+    return true;
+  }
+
+  function onSquareClick({ square, piece }: SquareHandlerArgs) {
+    // piece clicked to move
+    if (!moveFrom && piece) {
+      // get the move options for the square
+      const hasMoveOptions = getMoveOptions(square as Square);
+
+      // if move options, set the moveFrom to the square
+      if (hasMoveOptions) {
+        setMoveFrom(square);
+      }
+
+      // return early
+      return;
+    }
+
+    // square clicked to move to, check if valid move
+    const moves = chessGame.moves({
+      square: moveFrom as Square,
+      verbose: true
+    });
+    const foundMove = moves.find(m => m.from === moveFrom && m.to === square);
+
+    // not a valid move
+    if (!foundMove) {
+      // check if clicked on new piece
+      const hasMoveOptions = getMoveOptions(square as Square);
+
+      // if new piece, setMoveFrom, otherwise clear moveFrom
+      setMoveFrom(hasMoveOptions ? square : '');
+
+      // return early
+      return;
+    }
+
+    // is normal move
+    try {
+      chessGame.move({
+        from: moveFrom,
+        to: square,
+        promotion: 'q'
       });
-  }, []);
+    } catch {
+      // if invalid, setMoveFrom and getMoveOptions
+      const hasMoveOptions = getMoveOptions(square as Square);
 
+      // if new piece, setMoveFrom, otherwise clear moveFrom
+      if (hasMoveOptions) {
+        setMoveFrom(square);
+      }
+
+      // return early
+      return;
+    }
+
+    // update the position state
+    setChessPosition(chessGame.fen());
+
+    // clear moveFrom and optionSquares
+    setMoveFrom('');
+    setOptionSquares({});
+  }
+
+  // handle piece drop
   function onPieceDrop({ sourceSquare, targetSquare }: PieceDropHandlerArgs) {
-    console.log("Tah z", sourceSquare, "na", targetSquare); // debugger log
+    // type narrow targetSquare potentially being null (e.g. if dropped off board)
+    if (!targetSquare) {
+      return false;
+    }
 
-    // targetSquare can be null if piece is dropped off board
-    if (!targetSquare) return false;
+    // try to make the move according to chess.js logic
+    try {
+      chessGame.move({
+        from: sourceSquare,
+        to: targetSquare,
+        promotion: 'q' // always promote to a queen for example simplicity
+      });
 
-    // Create a new Chess instance and load current game state
-    // (This is made this way so react-chessboard can update the board (newer version requires this))
-    const gameCopy = new Chess();
-    gameCopy.loadPgn(game.pgn());
+      // update the position state upon successful move to trigger a re-render of the chessboard
+      setChessPosition(chessGame.fen());
 
-    const move = gameCopy.move({
-      from: sourceSquare,
-      to: targetSquare,
-      promotion: "q",
-    } as any);
+      // clear moveFrom and optionSquares
+      setMoveFrom('');
+      setOptionSquares({});
 
-    if (move === null) {
-      return false; // tah není povolen
-    } else {
-      // Update state with new game instance
-      setGame(gameCopy);
-      setFen(gameCopy.fen());
-      setMoves(m => [...m, { from: sourceSquare, to: targetSquare, piece: move.piece, captured: (move as any).captured }]);
-
-      // this is logging to the backend (Unneeded)
-      /*
-      fetch("http://localhost:8000/api/move", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ from_square: sourceSquare, to_square: targetSquare }),
-      }).catch(() => { });
-      */
-      return true; // tah povolen
+      // return true as the move was successful
+      return true;
+    } catch {
+      // return false as the move was not successful
+      return false;
     }
   }
 
+  // reset the game
   function onReset() {
-    const newGame = new Chess();
-    setGame(newGame);
-    setFen(newGame.fen());
-    setMoves([]);
+    chessGame.reset();
+    setChessPosition(chessGame.fen());
+    setMoveFrom('');
+    setOptionSquares({});
   }
 
+  // set the chessboard options
+  const chessboardOptions = {
+    onPieceDrop,
+    onSquareClick,
+    position: chessPosition,
+    squareStyles: optionSquares,
+    id: 'click-or-drag-to-move'
+  };
+
+  // render the chessboard with reset button
   return (
-    <div style={{ display: "flex", gap: 16, flexWrap: "wrap", maxWidth: "100vw" }}>
-      <div style={{ flex: "1 1 auto", minWidth: 280, maxWidth: boardWidth }}>
-        <Chessboard
-          options={{
-            position: fen,
-            onPieceDrop: onPieceDrop,
-            boardStyle: { width: `${boardWidth}px` }
-          }}
-        />
-        <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-          <button onClick={onReset}>Reset</button>
-          <div id="status" style={{ marginLeft: "auto", alignSelf: "center" }}></div>
-        </div>
-      </div>
-      <div style={{ flexShrink: 0, width: 220, minWidth: 200 }}>
-        <h3>Moves</h3>
-        <ol>
-          {moves.map((mv, i) => (
-            <li key={i}>
-              {mv.from} → {mv.to} {mv.captured ? `(x ${mv.captured})` : ""}
-            </li>
-          ))}
-        </ol>
+    <div>
+      <Chessboard options={chessboardOptions} />
+      <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
+        <button onClick={onReset}>Reset Game</button>
+        {chessGame.isGameOver() && (
+          <div style={{ marginLeft: 16, alignSelf: "center", fontWeight: "bold" }}>
+            {chessGame.isCheckmate()
+              ? `Checkmate! ${chessGame.turn() === 'w' ? 'Black' : 'White'} wins!`
+              : chessGame.isDraw()
+                ? 'Draw!'
+                : 'Game Over'}
+          </div>
+        )}
       </div>
     </div>
   );
