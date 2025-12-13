@@ -19,6 +19,7 @@ export default function ChessGame({ onMove, onGameStateChange }: ChessGameProps)
   const [chessPosition, setChessPosition] = useState(chessGame.fen());
   const [moveFrom, setMoveFrom] = useState('');
   const [optionSquares, setOptionSquares] = useState<Record<string, React.CSSProperties>>({});
+  const [kingSquare, setKingSquare] = useState<string | null>(null);
 
   // notify parent of game state changes
   useEffect(() => {
@@ -31,6 +32,28 @@ export default function ChessGame({ onMove, onGameStateChange }: ChessGameProps)
       });
     }
   }, [chessPosition]);
+
+  // detect if king is in check and find its position
+  useEffect(() => {
+    if (chessGame.inCheck()) {
+      const currentTurn = chessGame.turn();
+      // find the king's square
+      const board = chessGame.board();
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          const piece = board[row][col];
+          if (piece && piece.type === 'k' && piece.color === currentTurn) {
+            const file = String.fromCharCode(97 + col); // 'a' to 'h'
+            const rank = (8 - row).toString(); // '8' to '1'
+            setKingSquare(file + rank);
+            return;
+          }
+        }
+      }
+    } else {
+      setKingSquare(null);
+    }
+  }, [chessPosition, chessGame]);
 
   // get the move options for a square to show valid moves
   function getMoveOptions(square: Square) {
@@ -62,6 +85,13 @@ export default function ChessGame({ onMove, onGameStateChange }: ChessGameProps)
     newSquares[square] = {
       background: 'rgba(255, 255, 0, 0.4)'
     };
+
+    // add king in check highlight if applicable
+    if (kingSquare && !newSquares[kingSquare]) {
+      newSquares[kingSquare] = {
+        background: 'rgba(255, 0, 0, 0.6)'
+      };
+    }
 
     setOptionSquares(newSquares);
 
@@ -159,11 +189,19 @@ export default function ChessGame({ onMove, onGameStateChange }: ChessGameProps)
   }
 
   // chessboard options
+  // always show king in check if applicable
+  const customSquares = { ...optionSquares };
+  if (kingSquare && !customSquares[kingSquare]) {
+    customSquares[kingSquare] = {
+      background: 'rgba(255, 0, 0, 0.6)'
+    };
+  }
+
   const chessboardOptions = {
     onPieceDrop,
     onSquareClick,
     position: chessPosition,
-    squareStyles: optionSquares,
+    squareStyles: customSquares,
     id: 'click-or-drag-to-move'
   };
 
