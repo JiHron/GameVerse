@@ -109,7 +109,6 @@
     cursor: not-allowed;
 }
 
-/* Game Status */
 .gameStatus {
     padding: 12px 16px;
     background: #fff3e0;
@@ -120,7 +119,6 @@
     margin-bottom: 20px;
 }
 
-/* Move List */
 .moveList {
     display: flex;
     flex-direction: column;

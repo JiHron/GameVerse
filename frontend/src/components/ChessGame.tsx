@@ -37,7 +37,7 @@ export default function ChessGame({ onMove, onGameStateChange }: ChessGameProps)
   useEffect(() => {
     if (chessGame.inCheck()) {
       const currentTurn = chessGame.turn();
-      // find the king's square
+      // find the king
       const board = chessGame.board();
       for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 8; col++) {
@@ -55,23 +55,20 @@ export default function ChessGame({ onMove, onGameStateChange }: ChessGameProps)
     }
   }, [chessPosition, chessGame]);
 
-  // get the move options for a square to show valid moves
   function getMoveOptions(square: Square) {
     const moves = chessGame.moves({
       square,
       verbose: true
     });
 
-    // if no moves, clear the option squares (may continue to show last touched piece)
+    // if no moves, clear the option squares
     if (moves.length === 0) {
       setOptionSquares({});
       return false;
     }
 
-    // create a new object to store the option squares
     const newSquares: Record<string, React.CSSProperties> = {};
 
-    // show all possible moves with this piece
     for (const move of moves) {
       newSquares[move.to] = {
         background: chessGame.get(move.to) && chessGame.get(move.to)?.color !== chessGame.get(square)?.color
@@ -127,7 +124,7 @@ export default function ChessGame({ onMove, onGameStateChange }: ChessGameProps)
       return;
     }
 
-    // is normal move
+    // normal move
     try {
       const move = chessGame.move({
         from: moveFrom,
@@ -135,7 +132,6 @@ export default function ChessGame({ onMove, onGameStateChange }: ChessGameProps)
         promotion: 'q'
       });
 
-      // update the position state
       setChessPosition(chessGame.fen());
 
       // notify parent of the move
@@ -157,14 +153,11 @@ export default function ChessGame({ onMove, onGameStateChange }: ChessGameProps)
     }
   }
 
-  // handle piece drop
   function onPieceDrop({ sourceSquare, targetSquare }: PieceDropHandlerArgs) {
-    // catch null targetSquare (if dropped off board)
     if (!targetSquare) {
       return false;
     }
 
-    // try to make the move according to chess.js logic
     try {
       const move = chessGame.move({
         from: sourceSquare,

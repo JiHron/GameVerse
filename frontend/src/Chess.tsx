@@ -18,7 +18,7 @@ export default function App() {
   const timerRef = useRef<number | null>(null);
   const chessGameKey = useRef(0);
 
-  // Timer logic
+  // Timer
   useEffect(() => {
     if (isTimerActive && !gameState.isGameOver) {
       timerRef.current = window.setInterval(() => {
