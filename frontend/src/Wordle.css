@@ -195,6 +195,7 @@ h1 {
   align-items: center;
   user-select: none;
   transition: border-color 0.2s ease;
+  color: #000;
 }
 .key.key-big {
   font-size: 19px;
@@ -589,6 +590,7 @@ h1 {
 .card-icon {
   margin-bottom: 10px;
   transition: transform 0.2s;
+  color:#000;
 }
 
 /* Zvětšení ikonky při výběru */
@@ -602,6 +604,7 @@ h1 {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  color: #000;
 }
 
 /* Responsivita pro mobily - menší karty */
@@ -623,4 +626,8 @@ h1 {
   .card-name {
     font-size: 0.75rem;
   }
+}
+.menu-container h2 {
+  color: #000;
+  margin-bottom: 10px; /* Volitelná úprava mezery pod nadpisem */
 }
