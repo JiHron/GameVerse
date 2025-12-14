@@ -308,7 +308,7 @@ h1 {
 }
 
 .leave-btn:hover {
-  background-color: #f0f0f0;
+  background-color: #e7e7e7;
   border-color: #333;
 }
 
@@ -496,5 +496,131 @@ h1 {
   .wordle-app-container {
     padding-left: 5px;
     padding-right: 5px;
+  }
+}
+
+/* MENU A KATEGORIE */
+.menu-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.menu-description {
+  font-size: 0.9rem;
+  color: #666;
+  margin-top: -10px;
+}
+
+/* Velké startovací tlačítko */
+.start-btn {
+  width: 200px;
+  height: 60px;
+  font-size: 1.2rem;
+  margin-top: 70px;
+  background-color: #61AF26;
+  color: white;
+  border: none;
+  border-radius: 4px; /* Stejné jako leave-btn */
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.start-btn:hover {
+  background-color: #4e8f1d;
+}
+
+/* Mřížka kategorií */
+.categories-grid {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 70px 0;
+}
+
+/* Samotná buňka/karta */
+.category-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  
+  width: 120px;
+  height: 120px;
+  
+  background-color: #f5f5f5;
+  border: 3px solid #e0e0e0;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  user-select: none;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Hover efekt (pokud není vybráno) */
+.category-card:hover {
+  transform: translateY(-3px);
+  border-color: #b0b0b0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* Je vybráno */
+.category-card.selected {
+  background-color: #f0ffe0;
+  border-color: #61AF26;
+  color: #61AF26;
+  box-shadow: 0 4px 0px #4e8f1d;
+  transform: translateY(-3px);
+}
+
+.category-card.selected:active {
+  transform: translateY(0px);
+  box-shadow: none;
+}
+
+/* Ikonka uvnitř */
+.card-icon {
+  margin-bottom: 10px;
+  transition: transform 0.2s;
+}
+
+/* Zvětšení ikonky při výběru */
+.category-card.selected .card-icon {
+  transform: scale(1.1);
+}
+
+/* Text názvu */
+.card-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Responsivita pro mobily - menší karty */
+@media (max-width: 500px) {
+  .category-card {
+    width: 100px;
+    height: 100px;
+  }
+  
+  .categories-grid {
+    gap: 10px;
+  }
+  
+  .card-icon svg {
+    width: 30px;
+    height: 30px;
+  }
+  
+  .card-name {
+    font-size: 0.75rem;
   }
 }
