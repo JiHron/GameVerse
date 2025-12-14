@@ -9,6 +9,7 @@ import './App.css';
 import Wordle from './Wordle';
 import Chess from './Chess';
 import Sudoku from './components/Sudoku/Sudoku'; 
+import sudokuImg from "./assets/sudoku.png"
 import wordleImg from "./assets/wordle.png"
 import chessImg from "./assets/chess.png"
 
