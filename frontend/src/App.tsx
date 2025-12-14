@@ -11,6 +11,7 @@ import Chess from './Chess';
 import Sudoku from './components/Sudoku/Sudoku'; 
 import wordleImg from "./assets/wordle.png"
 import chessImg from "./assets/chess.png"
+import sudokuImg from "./assets/sudoku.png"
 
 // Hlavní komponenta aplikace - nastavuje routy pro jednotlivé hry
 const App: React.FC = () => {
