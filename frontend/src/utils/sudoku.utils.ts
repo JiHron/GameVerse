@@ -1,5 +1,22 @@
+/**
+ * @file sudoku.utils.ts
+ * @brief Pomocné funkcie a dáta pre Sudoku hernú logiku
+ * @author Natalia Holbikova (xholbin00)
+ * @date 2025
+ * 
+ * Tento súbor obsahuje:
+ * - Pomocné funkcie pre prácu s hernou doskou
+ * - Generátory pre špeciálne herné režimy
+ * - Validačné funkcie
+ * - Kolekciu predpripravených Sudoku puzzlov pre všetky obtiažnosti
+ */
+
 import { Cell, ComparisonData, ComparisonSymbol, OddEvenConstraint, GameMode } from '../types/sudoku.types';
 
+/**
+ * Inicializuje prázdnu 9x9 hernú dosku
+ * @returns Dvojrozmerné pole prázdnych buniek
+ */
 export const initializeBoard = (): Cell[][] => {
   return Array(9).fill(null).map(() =>
     Array(9).fill(null).map(() => ({
@@ -11,22 +28,33 @@ export const initializeBoard = (): Cell[][] => {
   );
 };
 
+/**
+ * Vytvorí hernú dosku z číselných dát
+ * @param data - Dvojrozmerné pole čísel (0-9)
+ * @returns Doska s bunkami obsahujúcimi hodnoty a metadata
+ */
 export const createBoardFromData = (data: number[][]): Cell[][] => {
   return data.map(row =>
     row.map(value => ({
       value: value as any,
-      isInitial: value !== 0,
+      isInitial: value !== 0,  // Nenulové hodnoty sú počiatočné
       isError: false,
       notes: new Set<number>()
     }))
   );
 };
 
-// Generovanie comparison dát na základe riešenia
+/**
+ * Generuje porovnávacie symboly pre Comparison režim
+ * Symboly ukazujú, ktoré číslo je väčšie medzi susednými bunkami
+ * @param solution - Riešenie Sudoku
+ * @returns Objekt s horizontálnymi a vertikálnymi symbolmi
+ */
 export const generateComparisonData = (solution: number[][]): ComparisonData => {
   const horizontal: ComparisonSymbol[][] = [];
   const vertical: ComparisonSymbol[][] = [];
 
+  // Horizontálne symboly (< alebo >) medzi susednými stĺpcami
   for (let row = 0; row < 9; row++) {
     horizontal[row] = [];
     for (let col = 0; col < 8; col++) {
@@ -38,6 +66,7 @@ export const generateComparisonData = (solution: number[][]): ComparisonData => 
     }
   }
 
+  // Vertikálne symboly (^ alebo v) medzi susednými riadkami
   for (let row = 0; row < 8; row++) {
     vertical[row] = [];
     for (let col = 0; col < 9; col++) {
@@ -52,13 +81,17 @@ export const generateComparisonData = (solution: number[][]): ComparisonData => 
   return { horizontal, vertical };
 };
 
-// Generovanie odd/even vzoru na základe riešenia
+/**
+ * Generuje pattern párne/nepárne pre Odd-Even režim
+ * Každá bunka má obmedzenie podľa riešenia
+ * @param solution - Riešenie Sudoku
+ * @returns 9x9 pole s obmedzeniami 'odd' alebo 'even'
+ */
 export const generateOddEvenPattern = (solution: number[][]): OddEvenConstraint[][] => {
   const pattern: OddEvenConstraint[][] = [];
   for (let row = 0; row < 9; row++) {
     pattern[row] = [];
     for (let col = 0; col < 9; col++) {
-      // Každá bunka má constraint podľa hodnoty v riešení
       const value = solution[row][col];
       pattern[row][col] = value % 2 === 0 ? 'even' : 'odd';
     }
@@ -66,14 +99,31 @@ export const generateOddEvenPattern = (solution: number[][]): OddEvenConstraint[
   return pattern;
 };
 
-// Kontrola, či je bunka na diagonále
+/**
+ * Kontroluje, či sa bunka nachádza na diagonále
+ * @param row - Riadok bunky
+ * @param col - Stĺpec bunky
+ * @returns True ak je bunka na hlavnej alebo vedľajšej diagonále
+ */
 export const isOnDiagonal = (row: number, col: number): boolean => {
-  const onMainDiagonal = row === col;
-  const onAntiDiagonal = row + col === 8;
+  const onMainDiagonal = row === col;              // Hlavná diagonála (ľavý horný → pravý dolný)
+  const onAntiDiagonal = row + col === 8;          // Vedľajšia diagonála (pravý horný → ľavý dolný)
   return onMainDiagonal || onAntiDiagonal;
 };
 
-// Validácia hodnoty podľa režimu
+/**
+ * Validuje ťah podľa herného režimu
+ * Kontroluje, či je hodnota správna a či vyhovuje pravidlám režimu
+ * @param value - Vkladaná hodnota
+ * @param row - Riadok bunky
+ * @param col - Stĺpec bunky
+ * @param board - Aktuálna herná doska
+ * @param solution - Správne riešenie
+ * @param mode - Herný režim
+ * @param comparisonData - Dáta pre comparison režim (voliteľné)
+ * @param oddEvenPattern - Pattern pre odd-even režim (voliteľné)
+ * @returns True ak je ťah platný
+ */
 export const validateMoveForMode = (
   value: number,
   row: number,
@@ -84,14 +134,15 @@ export const validateMoveForMode = (
   comparisonData?: ComparisonData,
   oddEvenPattern?: OddEvenConstraint[][]
 ): boolean => {
-  // Základná validácia - musí byť správna hodnota
+  // Základná validácia - hodnota musí byť správna
   if (solution[row][col] !== value) {
     return false;
   }
 
-  // Dodatočná validácia podľa režimu
+  // Dodatočná validácia podľa herného režimu
   switch (mode) {
     case 'odd-even':
+      // Kontrola párne/nepárne obmedzenia
       if (oddEvenPattern && oddEvenPattern[row][col]) {
         const constraint = oddEvenPattern[row][col];
         if (constraint === 'odd' && value % 2 === 0) return false;
@@ -111,10 +162,11 @@ export const validateMoveForMode = (
   return true;
 };
 
-// ============================================
-// DIAGONAL SUDOKU PUZZLES
-// Diagonály obsahujú čísla 1-9 bez opakovania
-// ============================================
+/**
+ * Kolekcia Diagonal Sudoku puzzlov
+ * Tieto puzzly majú dodatočné obmedzenie:
+ * Obe diagonály musia obsahovať čísla 1-9 bez opakovania
+ */
 const DIAGONAL_PUZZLES = [
   {
     board: [
@@ -166,10 +218,12 @@ const DIAGONAL_PUZZLES = [
   }
 ];
 
-// ============================================
-// CLASSIC SUDOKU PUZZLES
-// ============================================
+/**
+ * Kolekcia klasických Sudoku puzzlov
+ * Organizované podľa obtiažnosti: easy, medium, hard
+ */
 const CLASSIC_PUZZLES = {
+  // Ľahké puzzly - viac vyplnených buniek
   easy: [
     {
       board: [
@@ -244,6 +298,8 @@ const CLASSIC_PUZZLES = {
       ]
     }
   ],
+  
+  // Stredné puzzly - menej vyplnených buniek
   medium: [
     {
       board: [
@@ -294,6 +350,8 @@ const CLASSIC_PUZZLES = {
       ]
     }
   ],
+  
+  // Ťažké puzzly - minimum vyplnených buniek
   hard: [
     {
       board: [
@@ -346,7 +404,12 @@ const CLASSIC_PUZZLES = {
   ]
 };
 
-// Generuj sudoku podľa režimu a obtiažnosti
+/**
+ * Generuje Sudoku puzzle podľa režimu a obtiažnosti
+ * @param mode - Herný režim
+ * @param difficulty - Úroveň obtiažnosti
+ * @returns Objekt s hernou doskou, riešením a prípadnými dodatočnými dátami
+ */
 export const generateSudoku = (
   mode: GameMode,
   difficulty: 'easy' | 'medium' | 'hard' = 'medium'
@@ -394,6 +457,7 @@ export const generateSudoku = (
 
     case 'classic':
     default:
+      // Klasický režim - náhodný výber z danej obtiažnosti
       const puzzles = CLASSIC_PUZZLES[difficulty];
       const randomIndex = Math.floor(Math.random() * puzzles.length);
       puzzle = {
@@ -410,7 +474,10 @@ export const generateSudoku = (
   };
 };
 
-// Zachovanie starej funkcie pre kompatibilitu
+/**
+ * Zachovanie starej funkcie pre kompatibilitu
+ * @deprecated Použite radšej generateSudoku s parametrom mode='classic'
+ */
 export const generateTestSudoku = (difficulty: 'easy' | 'medium' | 'hard' = 'medium') => {
   return generateSudoku('classic', difficulty);
 };

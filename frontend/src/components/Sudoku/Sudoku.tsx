@@ -1,3 +1,14 @@
+/**
+ * @file Sudoku.tsx
+ * @brief Hlavný komponent Sudoku hry s rôznymi herými režimami
+ * @author Natalia Holbikova (xholbin00)
+ * @date 2025
+ * 
+ * Tento komponent implementuje kompletné Sudoku používateľské rozhranie
+ * vrátane hernej dosky, ovládacích prvkov, nastavení a modálnych okien.
+ * Podporuje 4 herné režimy: Classic, Comparison, Odd/Even, Diagonal
+ */
+
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SudokuBoard from './SudokuBoard';
@@ -5,8 +16,14 @@ import { useSudoku } from '../../hooks/useSudoku';
 import { CellValue } from '../../types/sudoku.types';
 import '../../styles/Sudoku.css';
 
+/**
+ * Hlavný komponent Sudoku aplikácie
+ * Spravuje zobrazenie hry, používateľskú interakciu a herný stav
+ */
 const Sudoku: React.FC = () => {
   const navigate = useNavigate();
+  
+  // Custom hook pre správu herného stavu a logiky
   const { 
     gameState, 
     startNewGame, 
@@ -21,20 +38,35 @@ const Sudoku: React.FC = () => {
     changeDifficulty
   } = useSudoku();
 
+  // Inicializácia novej hry pri načítaní komponenty
   useEffect(() => {
     startNewGame();
   }, [startNewGame]);
 
+  /**
+   * Spracuje kliknutie na tlačidlo s číslom
+   * @param value - Číslo od 1 do 9
+   */
   const handleNumberClick = (value: CellValue) => {
     makeMove(value);
   };
 
+  /**
+   * Formátuje čas v sekundách na formát MM:SS
+   * @param seconds - Počet sekúnd
+   * @returns Sformátovaný čas (napr. "05:42")
+   */
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  /**
+   * Vracia popis obtiažnosti pre zobrazenie
+   * @param diff - Úroveň obtiažnosti
+   * @returns Popis obtiažnosti v slovenčine
+   */
   const getDifficultyLabel = (diff: string): string => {
     switch(diff) {
       case 'easy': return 'Easy';
@@ -48,19 +80,21 @@ const Sudoku: React.FC = () => {
     <div className="sudoku-container">
       <h1>ULTIMATE SUDOKU</h1>
 
+      {/* Tlačidlo späť do menu */}
       <button onClick={() => navigate('/')} className="btn-back">
         ← Back to Menu
       </button>
       
       <div className="game-layout">
-        {/* Ľavá strana - Doska */}
+        {/* Ľavá sekcia - Herná doska a ovládacie prvky */}
         <div className="board-section">
+          {/* Herná doska 9x9 */}
           <SudokuBoard 
             gameState={gameState} 
             onCellClick={selectCell} 
           />
           
-          {/* Tlačidlá pod doskou */}
+          {/* Akčné tlačidlá pod doskou */}
           <div className="action-buttons">
             <button onClick={eraseCell} className="btn-action">
               Eraser
@@ -82,7 +116,7 @@ const Sudoku: React.FC = () => {
             </button>
           </div>
           
-          {/* Číselník */}
+          {/* Číselná klávesnica pre zadávanie hodnôt */}
           <div className="keypad">
             <span className="keypad-label">Keypad:</span>
             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
@@ -97,9 +131,9 @@ const Sudoku: React.FC = () => {
           </div>
         </div>
         
-        {/* Pravá strana - Nastavenia */}
+        {/* Pravá sekcia - Nastavenia a štatistiky */}
         <div className="settings-section">
-          {/* MODES */}
+          {/* Panel herných režimov */}
           <div className="settings-panel">
             <h3>MODES</h3>
             <button 
@@ -127,7 +161,7 @@ const Sudoku: React.FC = () => {
               <span className="radio"></span> Diagonal (X)
             </button>
             
-            {/* Info o aktuálnom režime */}
+            {/* Informačný box o aktuálnom režime */}
             <div className="mode-info">
               {gameState.mode === 'classic' && '🎯 Klasické Sudoku pravidlá.'}
               {gameState.mode === 'comparison' && '⚖️ Symboly < > ^ v ukazujú, ktoré číslo je väčšie/menšie.'}
@@ -136,7 +170,7 @@ const Sudoku: React.FC = () => {
             </div>
           </div>
           
-          {/* DIFFICULTY */}
+          {/* Panel obtiažnosti */}
           <div className="settings-panel">
             <h3>DIFFICULTY</h3>
             <div className="difficulty-buttons">
@@ -161,7 +195,7 @@ const Sudoku: React.FC = () => {
             </div>
           </div>
           
-          {/* TIME / ČAS */}
+          {/* Panel času */}
           <div className="settings-panel">
             <h3>TIME</h3>
             <div className="time-display">
@@ -169,9 +203,10 @@ const Sudoku: React.FC = () => {
             </div>
           </div>
           
-          {/* STATS */}
+          {/* Panel štatistík */}
           <div className="settings-panel">
             <h3>STATS</h3>
+            {/* Progress bar pre vyplnené bunky */}
             <div className="stats-bar">
               <div className="stat-filled" style={{width: `${(gameState.filledCells/81)*100}%`}}></div>
             </div>
@@ -186,7 +221,7 @@ const Sudoku: React.FC = () => {
         </div>
       </div>
 
-      {/* Popup okno pri výhre - CONGRATS */}
+      {/* Modálne okno pri výhre */}
       {gameState.isComplete && (
         <div className="modal-overlay">
           <div className="modal congrats-modal">
@@ -217,7 +252,7 @@ const Sudoku: React.FC = () => {
         </div>
       )}
 
-      {/* Popup okno pri prehre - Try again */}
+      {/* Modálne okno pri prehre */}
       {gameState.isGameOver && (
         <div className="modal-overlay">
           <div className="modal gameover-modal">

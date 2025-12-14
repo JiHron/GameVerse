@@ -1,9 +1,28 @@
+/**
+ * @file useSudoku.ts
+ * @brief Custom React hook pre správu hernej logiky Sudoku
+ * @author Natalia Holbikova (xholbin00)
+ * @date 2025
+ * 
+ * Tento hook zapúzdriuje všetku hernú logiku Sudoku vrátane:
+ * - Správy herného stavu
+ * - Validácie ťahov
+ * - Histórie ťahov pre undo funkciu
+ * - Časovača
+ * - Načítania hier z API alebo lokálneho generátora
+ */
+
 import { useState, useCallback, useEffect } from 'react';
 import { GameState, CellValue, GameMode, Difficulty } from '../types/sudoku.types';
 import { initializeBoard, createBoardFromData, generateSudoku, validateMoveForMode } from '../utils/sudoku.utils';
 import { sudokuApi } from '../services/sudokuApi';
 
+/**
+ * Custom hook pre Sudoku hernú logiku
+ * @returns Objekt s herným stavom a funkciami pre manipuláciu hry
+ */
 export const useSudoku = () => {
+  // Hlavný herný stav
   const [gameState, setGameState] = useState<GameState>({
     board: initializeBoard(),
     solution: [],
@@ -24,13 +43,18 @@ export const useSudoku = () => {
     oddEvenPattern: undefined
   });
 
+  // História stavov pre undo funkciu
   const [history, setHistory] = useState<GameState[]>([]);
-  const [useApi, setUseApi] = useState<boolean>(true);
   
-  // Ref pre sledovanie či už bola hra inicializovaná
- // const isInitialized = useRef(false);
+  // Flag pre použitie API (ak je dostupné)
+  const [useApi, setUseApi] = useState<boolean>(true);
 
-  // Funkcia pre začatie novej hry
+  /**
+   * Spustí novú hru s voliteľným režimom a obtiažnosťou
+   * Najprv sa pokúsi načítať z API, pri zlyhaní použije lokálny generátor
+   * @param overrideMode - Voliteľný herný režim
+   * @param overrideDifficulty - Voliteľná obtiažnosť
+   */
   const startNewGame = useCallback(async (
     overrideMode?: GameMode,
     overrideDifficulty?: Difficulty
@@ -38,17 +62,18 @@ export const useSudoku = () => {
     const mode = overrideMode ?? gameState.mode;
     const difficulty = overrideDifficulty ?? gameState.difficulty;
     
+    // Nastavenie počtu undo a limitu chýb podľa obtiažnosti
     const undosCount = difficulty === 'easy' ? 5 : difficulty === 'medium' ? 3 : 0;
     const mistakesLimit = difficulty === 'hard' ? 3 : 0;
 
-    // Skús použiť API
+    // Pokus o načítanie z API
     if (useApi) {
       try {
         const response = await sudokuApi.newGame(difficulty, mode);
         const newBoard = createBoardFromData(response.board);
         const solution = response.solution || response.board;
 
-        // Pre špeciálne režimy potrebujeme dodatočné dáta
+        // Pre špeciálne režimy generujeme dodatočné dáta
         const { comparisonData, oddEvenPattern } = generateSudoku(mode, difficulty);
 
         setGameState({
@@ -78,7 +103,7 @@ export const useSudoku = () => {
       }
     }
 
-    // Lokálne generovanie
+    // Lokálne generovanie (fallback)
     const { board, solution, comparisonData, oddEvenPattern } = generateSudoku(mode, difficulty);
     const newBoard = createBoardFromData(board);
 
@@ -104,7 +129,11 @@ export const useSudoku = () => {
     setHistory([]);
   }, [gameState.difficulty, gameState.mode, useApi]);
 
-  // Výber bunky
+  /**
+   * Vyberie bunku na hernej doske
+   * @param row - Riadok bunky (0-8)
+   * @param col - Stĺpec bunky (0-8)
+   */
   const selectCell = useCallback((row: number, col: number) => {
     setGameState(prev => ({
       ...prev,
@@ -112,19 +141,26 @@ export const useSudoku = () => {
     }));
   }, []);
 
-  // Vloženie čísla
+  /**
+   * Vloží číslo do vybranej bunky alebo pridá/odstráni poznámku
+   * Vykonáva validáciu podľa herného režimu
+   * @param value - Hodnota 1-9 alebo 0 pre vymazanie
+   */
   const makeMove = useCallback(async (value: CellValue) => {
     if (!gameState.selectedCell || gameState.isGameOver) return;
     
     const { row, col } = gameState.selectedCell;
+    // Nemožno meniť počiatočné bunky
     if (gameState.board[row][col].isInitial) return;
 
+    // Uložiť stav do histórie pre undo
     setHistory(prev => [...prev, gameState]);
 
-    // Lokálna validácia s ohľadom na režim
     setGameState(prev => {
+      // Deep copy dosky kvôli Set objektom v poznámkach
       const newBoard = prev.board.map(r => r.map(c => ({...c, notes: new Set(c.notes)})));
       
+      // Režim poznámok - pridaj/odoober poznámku
       if (prev.isNotesMode && value !== 0) {
         if (newBoard[row][col].notes.has(value)) {
           newBoard[row][col].notes.delete(value);
@@ -132,11 +168,12 @@ export const useSudoku = () => {
           newBoard[row][col].notes.add(value);
         }
       } else {
+        // Normálny režim - vlož hodnotu
         newBoard[row][col].value = value;
         newBoard[row][col].notes.clear();
         
         if (value !== 0) {
-          // Validácia podľa režimu
+          // Validácia ťahu podľa herného režimu
           const isValid = validateMoveForMode(
             value,
             row,
@@ -148,6 +185,7 @@ export const useSudoku = () => {
             prev.oddEvenPattern
           );
           
+          // Ak je ťah nesprávny, označ chybu
           if (!isValid) {
             newBoard[row][col].isError = true;
             const newMistakes = prev.mistakes + 1;
@@ -165,6 +203,7 @@ export const useSudoku = () => {
         newBoard[row][col].isError = false;
       }
       
+      // Kontrola dokončenia hry
       const filledCells = newBoard.flat().filter(c => c.value !== 0).length;
       const isComplete = filledCells === 81 && 
         newBoard.every((row, ri) => 
@@ -180,6 +219,9 @@ export const useSudoku = () => {
     });
   }, [gameState]);
 
+  /**
+   * Prepne režim poznámok (notes mode)
+   */
   const toggleNotesMode = useCallback(() => {
     setGameState(prev => ({
       ...prev,
@@ -187,6 +229,9 @@ export const useSudoku = () => {
     }));
   }, []);
 
+  /**
+   * Vymaže obsah vybranej bunky (hodnotu aj poznámky)
+   */
   const eraseCell = useCallback(async () => {
     if (!gameState.selectedCell || gameState.isGameOver) return;
     const { row, col } = gameState.selectedCell;
@@ -206,7 +251,9 @@ export const useSudoku = () => {
     });
   }, [gameState.selectedCell, gameState.isGameOver, gameState.board, gameState.solution]);
 
-  // Timer
+  /**
+   * Časovač hry - inkrementuje každú sekundu
+   */
   useEffect(() => {
     if (!gameState.isComplete && !gameState.isGameOver && gameState.solution.length > 0) {
       const timer = setInterval(() => {
@@ -219,7 +266,10 @@ export const useSudoku = () => {
     }
   }, [gameState.isComplete, gameState.isGameOver, gameState.solution.length]);
 
-  // Undo funkcia
+  /**
+   * Vráti jeden ťah späť z histórie
+   * Počet undo je limitovaný podľa obtiažnosti
+   */
   const undo = useCallback(() => {
     if (history.length === 0 || gameState.undosRemaining === 0) return;
     
@@ -232,18 +282,20 @@ export const useSudoku = () => {
     setHistory(prev => prev.slice(0, -1));
   }, [history, gameState.undosRemaining]);
 
-  // Hint funkcia
+  /**
+   * Poskytne nápovedu - vyplní správnu hodnotu do vybranej alebo prvej prázdnej bunky
+   */
   const giveHint = useCallback(async () => {
     if (gameState.isGameOver) return;
     
-    // Nájdi prvú prázdnu bunku ak nie je vybraná
+    // Nájdi cieľovú bunku (vybranú alebo prvú prázdnu)
     let targetRow = gameState.selectedCell?.row;
     let targetCol = gameState.selectedCell?.col;
     
     if (targetRow === undefined || targetCol === undefined || 
         gameState.board[targetRow][targetCol].isInitial ||
         gameState.board[targetRow][targetCol].value !== 0) {
-      // Nájdi prázdnu bunku
+      // Nájdi prvú prázdnu bunku
       outer: for (let r = 0; r < 9; r++) {
         for (let c = 0; c < 9; c++) {
           if (gameState.board[r][c].value === 0 && !gameState.board[r][c].isInitial) {
@@ -282,7 +334,9 @@ export const useSudoku = () => {
     });
   }, [gameState]);
 
-  // Reset hry
+  /**
+   * Resetuje hru do počiatočného stavu (zachová ten istý puzzle)
+   */
   const resetGame = useCallback(async () => {
     const newBoard = createBoardFromData(gameState.initialBoard);
     
@@ -304,14 +358,20 @@ export const useSudoku = () => {
     setHistory([]);
   }, [gameState.initialBoard, gameState.difficulty]);
 
-  // Zmena režimu - AUTOMATICKY ZAČNE NOVÚ HRU
+  /**
+   * Zmení herný režim a automaticky spustí novú hru
+   * @param mode - Nový herný režim
+   */
   const changeMode = useCallback((mode: GameMode) => {
     if (mode !== gameState.mode) {
       startNewGame(mode, gameState.difficulty);
     }
   }, [gameState.mode, gameState.difficulty, startNewGame]);
 
-  // Zmena obtiažnosti - AUTOMATICKY ZAČNE NOVÚ HRU
+  /**
+   * Zmení obtiažnosť a automaticky spustí novú hru
+   * @param difficulty - Nová obtiažnosť
+   */
   const changeDifficulty = useCallback((difficulty: Difficulty) => {
     if (difficulty !== gameState.difficulty) {
       startNewGame(gameState.mode, difficulty);
